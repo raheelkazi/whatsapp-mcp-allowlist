@@ -94,3 +94,44 @@ def test_normalize_rejects_unicode_digits():
 def test_check_send_rejects_garbage_input():
     with pytest.raises(AllowlistError):
         check_send("not a number", {"111@s.whatsapp.net": "Mom"})
+
+
+from dataclasses import dataclass
+from allowlist import filter_chats, filter_messages, filter_contacts
+
+
+@dataclass
+class FakeChat:
+    jid: str
+
+
+@dataclass
+class FakeMessage:
+    chat_jid: str
+
+
+@dataclass
+class FakeContact:
+    jid: str
+
+
+def test_filter_chats_keeps_only_allowed():
+    al = {"111@s.whatsapp.net": "Mom"}
+    chats = [FakeChat("111@s.whatsapp.net"), FakeChat("999@s.whatsapp.net")]
+    assert filter_chats(chats, al) == [FakeChat("111@s.whatsapp.net")]
+
+
+def test_filter_messages_keeps_only_allowed_chat():
+    al = {"111@s.whatsapp.net": "Mom"}
+    msgs = [FakeMessage("111@s.whatsapp.net"), FakeMessage("999@s.whatsapp.net")]
+    assert filter_messages(msgs, al) == [FakeMessage("111@s.whatsapp.net")]
+
+
+def test_filter_contacts_keeps_only_allowed():
+    al = {"111@s.whatsapp.net": "Mom"}
+    contacts = [FakeContact("111@s.whatsapp.net"), FakeContact("999@s.whatsapp.net")]
+    assert filter_contacts(contacts, al) == [FakeContact("111@s.whatsapp.net")]
+
+
+def test_filters_handle_empty_allowlist():
+    assert filter_chats([FakeChat("111@s.whatsapp.net")], {}) == []

@@ -54,3 +54,15 @@ def check_send(recipient: str, allowlist: dict[str, str]) -> str:
             f"{jid} is not in the allowlist; add it with manage_allowlist.py."
         )
     return jid
+
+
+def filter_chats(chats: list, allowlist: dict[str, str]) -> list:
+    return [c for c in chats if is_allowed(c.jid, allowlist)]
+
+
+def filter_messages(messages: list, allowlist: dict[str, str]) -> list:
+    return [m for m in messages if is_allowed(m.chat_jid, allowlist)]
+
+
+def filter_contacts(contacts: list, allowlist: dict[str, str]) -> list:
+    return [c for c in contacts if is_allowed(c.jid, allowlist)]
