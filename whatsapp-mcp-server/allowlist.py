@@ -36,9 +36,11 @@ def is_allowed(jid: str, allowlist: dict[str, str]) -> bool:
 
 def normalize_recipient(recipient: str) -> str:
     if "@" in recipient:
-        return recipient
+        if recipient.endswith("@s.whatsapp.net") or recipient.endswith("@g.us"):
+            return recipient
+        raise AllowlistError(f"{recipient!r} is not a valid WhatsApp JID.")
     digits = recipient.lstrip("+").replace(" ", "").replace("-", "")
-    if digits.isdigit():
+    if digits and all(c in "0123456789" for c in digits):
         return f"{digits}@s.whatsapp.net"
     raise AllowlistError(
         f"Cannot interpret recipient {recipient!r} as a phone number or JID."

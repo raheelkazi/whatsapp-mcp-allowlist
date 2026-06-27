@@ -75,3 +75,22 @@ def test_check_send_rejects_unlisted_target():
     al = {"1234567890@s.whatsapp.net": "Mom"}
     with pytest.raises(AllowlistError):
         check_send("999@s.whatsapp.net", al)
+
+
+def test_normalize_strips_phone_formatting():
+    assert normalize_recipient("+1 234-567-8900") == "12345678900@s.whatsapp.net"
+
+
+def test_normalize_rejects_malformed_jid():
+    with pytest.raises(AllowlistError):
+        normalize_recipient("foo@bar.baz")
+
+
+def test_normalize_rejects_unicode_digits():
+    with pytest.raises(AllowlistError):
+        normalize_recipient("١٢٣")
+
+
+def test_check_send_rejects_garbage_input():
+    with pytest.raises(AllowlistError):
+        check_send("not a number", {"111@s.whatsapp.net": "Mom"})
