@@ -6,9 +6,6 @@ from whatsapp import (
     list_messages as whatsapp_list_messages,
     list_chats as whatsapp_list_chats,
     get_chat as whatsapp_get_chat,
-    get_direct_chat_by_contact as whatsapp_get_direct_chat_by_contact,
-    get_contact_chats as whatsapp_get_contact_chats,
-    get_last_interaction as whatsapp_get_last_interaction,
     get_message_context as whatsapp_get_message_context,
     send_message as whatsapp_send_message,
     send_file as whatsapp_send_file,
@@ -221,7 +218,7 @@ def download_media(message_id: str, chat_jid: str) -> Dict[str, Any]:
         chat_jid: The JID of the chat containing the message
     
     Returns:
-        A dictionary containing success status, a status message, and the file path if successful
+        The underlying bridge result on success, or {"error": ...} if chat_jid is not in the allowlist.
     """
     if not is_allowed(chat_jid, ALLOWLIST):
         return {"error": f"{chat_jid} is not in the allowlist."}
