@@ -135,3 +135,11 @@ def test_filter_contacts_keeps_only_allowed():
 
 def test_filters_handle_empty_allowlist():
     assert filter_chats([FakeChat("111@s.whatsapp.net")], {}) == []
+
+
+def test_filter_messages_handles_empty_allowlist():
+    assert filter_messages([FakeMessage("111@s.whatsapp.net")], {}) == []
+
+
+def test_filter_contacts_handles_empty_allowlist():
+    assert filter_contacts([FakeContact("111@s.whatsapp.net")], {}) == []

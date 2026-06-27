@@ -2,11 +2,7 @@
   "mcpServers": {
     "whatsapp": {
       "command": "uv",
-      "args": ["--directory", "whatsapp-mcp-server", "run", "main.py"],
-      "autoApprove": [
-        "list_chats", "list_messages", "get_chat", "get_message_context",
-        "search_contacts", "download_media", "list_allowed_chats"
-      ]
+      "args": ["--directory", "whatsapp-mcp-server", "run", "main.py"]
     }
   }
 }

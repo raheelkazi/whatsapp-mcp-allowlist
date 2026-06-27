@@ -1,4 +1,5 @@
 import os
+import sqlite3
 from typing import List, Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
 from whatsapp import (
@@ -53,14 +54,18 @@ def list_messages(
     include_context: bool = True,
     context_before: int = 1,
     context_after: int = 1
-) -> List[Dict[str, Any]]:
-    """Get WhatsApp messages matching specified criteria with optional context.
-    
+) -> Any:
+    """Get WhatsApp messages for an allowlisted chat.
+
+    A chat_jid is required. Call list_allowed_chats to see permitted chats,
+    then pass one here. The bridge returns a pre-formatted string scoped to
+    the single allowlisted chat, so no further filtering is needed.
+
     Args:
         after: Optional ISO-8601 formatted string to only return messages after this date
         before: Optional ISO-8601 formatted string to only return messages before this date
         sender_phone_number: Optional phone number to filter messages by sender
-        chat_jid: Optional chat JID to filter messages by chat
+        chat_jid: Required chat JID to scope the query (must be in the allowlist)
         query: Optional search term to filter messages by content
         limit: Maximum number of messages to return (default 20)
         page: Page number for pagination (default 0)
@@ -68,9 +73,16 @@ def list_messages(
         context_before: Number of messages to include before each match (default 1)
         context_after: Number of messages to include after each match (default 1)
     """
-    if chat_jid is not None and not is_allowed(chat_jid, ALLOWLIST):
+    if chat_jid is None:
+        return {
+            "error": (
+                "list_messages requires a chat_jid. "
+                "Call list_allowed_chats to see permitted chats, then pass one."
+            )
+        }
+    if not is_allowed(chat_jid, ALLOWLIST):
         return {"error": f"{chat_jid} is not in the allowlist."}
-    messages = whatsapp_list_messages(
+    return whatsapp_list_messages(
         after=after,
         before=before,
         sender_phone_number=sender_phone_number,
@@ -82,7 +94,6 @@ def list_messages(
         context_before=context_before,
         context_after=context_after
     )
-    return filter_messages(messages, ALLOWLIST)
 
 @mcp.tool()
 def list_chats(
@@ -135,8 +146,11 @@ def get_message_context(
         before: Number of messages to include before the target message (default 5)
         after: Number of messages to include after the target message (default 5)
     """
-    ctx = whatsapp_get_message_context(message_id, before, after)
-    if ctx is None or not is_allowed(ctx.message.chat_jid, ALLOWLIST):
+    try:
+        ctx = whatsapp_get_message_context(message_id, before, after)
+    except (ValueError, sqlite3.Error) as e:
+        return {"error": f"Message not found or not retrievable: {e}"}
+    if not is_allowed(ctx.message.chat_jid, ALLOWLIST):
         return {"error": "Message not found or not in the allowlist."}
     ctx.before = filter_messages(ctx.before, ALLOWLIST)
     ctx.after = filter_messages(ctx.after, ALLOWLIST)

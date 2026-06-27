@@ -39,7 +39,7 @@ def normalize_recipient(recipient: str) -> str:
         if recipient.endswith("@s.whatsapp.net") or recipient.endswith("@g.us"):
             return recipient
         raise AllowlistError(f"{recipient!r} is not a valid WhatsApp JID.")
-    digits = recipient.lstrip("+").replace(" ", "").replace("-", "")
+    digits = recipient.removeprefix("+").replace(" ", "").replace("-", "")
     if digits and all(c in "0123456789" for c in digits):
         return f"{digits}@s.whatsapp.net"
     raise AllowlistError(

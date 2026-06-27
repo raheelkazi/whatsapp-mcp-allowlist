@@ -81,21 +81,29 @@ def test_get_chat_allowed_returns_bridge_result(main_with_allowlist, monkeypatch
 def test_list_messages_off_list_chat_jid_returns_error_without_calling_bridge(main_with_allowlist, monkeypatch):
     main = main_with_allowlist
     called = []
-    monkeypatch.setattr(main, "whatsapp_list_messages", lambda **kw: called.append(1) or [])
+    monkeypatch.setattr(main, "whatsapp_list_messages", lambda **kw: called.append(1) or "")
     result = main.list_messages(chat_jid="999@s.whatsapp.net")
     assert "error" in result
     assert called == [], "bridge must not be called for off-list chat_jid"
 
 
-def test_list_messages_no_chat_jid_filters_to_allowlisted(main_with_allowlist, monkeypatch):
+def test_list_messages_no_chat_jid_returns_error_without_calling_bridge(main_with_allowlist, monkeypatch):
+    """v1 requires chat_jid; None must short-circuit before the bridge."""
     main = main_with_allowlist
-    monkeypatch.setattr(main, "whatsapp_list_messages", lambda **kw: [
-        FakeMsg("111@s.whatsapp.net"),
-        FakeMsg("999@s.whatsapp.net"),
-    ])
+    called = []
+    monkeypatch.setattr(main, "whatsapp_list_messages", lambda **kw: called.append(1) or "")
     result = main.list_messages()
-    assert all(m.chat_jid == "111@s.whatsapp.net" for m in result)
-    assert len(result) == 1
+    assert "error" in result
+    assert called == [], "bridge must not be called when chat_jid is None"
+
+
+def test_list_messages_allowed_chat_jid_returns_string_verbatim(main_with_allowlist, monkeypatch):
+    """Bridge returns a pre-formatted string; tool must pass it through unchanged."""
+    main = main_with_allowlist
+    bridge_output = "[2024-01-01 10:00:00] From: Mom: Hello\n"
+    monkeypatch.setattr(main, "whatsapp_list_messages", lambda **kw: bridge_output)
+    result = main.list_messages(chat_jid="111@s.whatsapp.net")
+    assert result is bridge_output
 
 
 # ---------------------------------------------------------------------------
@@ -113,9 +121,12 @@ def test_get_message_context_off_list_returns_error(main_with_allowlist, monkeyp
     assert "error" in result
 
 
-def test_get_message_context_none_returns_error(main_with_allowlist, monkeypatch):
+def test_get_message_context_not_found_raises_and_returns_error(main_with_allowlist, monkeypatch):
+    """Real bridge raises ValueError when message is not found; tool must catch it."""
     main = main_with_allowlist
-    monkeypatch.setattr(main, "whatsapp_get_message_context", lambda *a: None)
+    def raise_value_error(*a):
+        raise ValueError("Message with ID msg-x not found")
+    monkeypatch.setattr(main, "whatsapp_get_message_context", raise_value_error)
     result = main.get_message_context("msg-x")
     assert "error" in result
 

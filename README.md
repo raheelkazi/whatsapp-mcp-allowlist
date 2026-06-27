@@ -23,9 +23,21 @@ allowlist of people and groups. Every send requires your confirmation.
    python3 manage_allowlist.py list
    ```
 
-3. **Register the MCP server:** copy `.mcp.json.example` to `.mcp.json`.
-   Send tools are intentionally not auto-approved, so Claude Code prompts you to
-   confirm every outgoing message.
+3. **Register the MCP server.** Copy `.mcp.json.example` to `.mcp.json` in the
+   project root — this tells Claude Code how to launch the server:
+   ```bash
+   cp .mcp.json.example .mcp.json
+   ```
+   Then copy `.claude/settings.json` into your project's `.claude/` directory to
+   auto-approve the 7 read-only tools so Claude Code can call them without
+   prompting:
+   ```bash
+   cp .claude/settings.json .claude/settings.json
+   ```
+   The `permissions.allow` entries follow the Claude Code naming convention
+   `mcp__<server>__<tool>`. The send tools (`send_message`, `send_file`) are
+   deliberately omitted from the allow-list, so every outgoing message requires
+   your explicit confirmation before it is sent.
 
 ## Tools
 
