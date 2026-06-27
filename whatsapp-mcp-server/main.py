@@ -1,3 +1,4 @@
+import os
 from typing import List, Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
 from whatsapp import (
@@ -14,6 +15,21 @@ from whatsapp import (
     send_audio_message as whatsapp_audio_voice_message,
     download_media as whatsapp_download_media
 )
+from allowlist import (
+    load_allowlist,
+    filter_chats,
+    filter_messages,
+    filter_contacts,
+    is_allowed,
+    AllowlistError,
+)
+
+ALLOWLIST_PATH = os.environ.get(
+    "WHATSAPP_ALLOWLIST_PATH",
+    os.path.join(os.path.dirname(__file__), "allowed_chats.json"),
+)
+# Fail-closed: if this raises, the server does not start.
+ALLOWLIST = load_allowlist(ALLOWLIST_PATH)
 
 # Initialize FastMCP server
 mcp = FastMCP("whatsapp")
@@ -21,12 +37,12 @@ mcp = FastMCP("whatsapp")
 @mcp.tool()
 def search_contacts(query: str) -> List[Dict[str, Any]]:
     """Search WhatsApp contacts by name or phone number.
-    
+
     Args:
         query: Search term to match against contact names or phone numbers
     """
     contacts = whatsapp_search_contacts(query)
-    return contacts
+    return filter_contacts(contacts, ALLOWLIST)
 
 @mcp.tool()
 def list_messages(
@@ -55,6 +71,8 @@ def list_messages(
         context_before: Number of messages to include before each match (default 1)
         context_after: Number of messages to include after each match (default 1)
     """
+    if chat_jid is not None and not is_allowed(chat_jid, ALLOWLIST):
+        return {"error": f"{chat_jid} is not in the allowlist."}
     messages = whatsapp_list_messages(
         after=after,
         before=before,
@@ -67,7 +85,7 @@ def list_messages(
         context_before=context_before,
         context_after=context_after
     )
-    return messages
+    return filter_messages(messages, ALLOWLIST)
 
 @mcp.tool()
 def list_chats(
@@ -93,7 +111,7 @@ def list_chats(
         include_last_message=include_last_message,
         sort_by=sort_by
     )
-    return chats
+    return filter_chats(chats, ALLOWLIST)
 
 @mcp.tool()
 def get_chat(chat_jid: str, include_last_message: bool = True) -> Dict[str, Any]:
@@ -103,40 +121,9 @@ def get_chat(chat_jid: str, include_last_message: bool = True) -> Dict[str, Any]
         chat_jid: The JID of the chat to retrieve
         include_last_message: Whether to include the last message (default True)
     """
-    chat = whatsapp_get_chat(chat_jid, include_last_message)
-    return chat
-
-@mcp.tool()
-def get_direct_chat_by_contact(sender_phone_number: str) -> Dict[str, Any]:
-    """Get WhatsApp chat metadata by sender phone number.
-    
-    Args:
-        sender_phone_number: The phone number to search for
-    """
-    chat = whatsapp_get_direct_chat_by_contact(sender_phone_number)
-    return chat
-
-@mcp.tool()
-def get_contact_chats(jid: str, limit: int = 20, page: int = 0) -> List[Dict[str, Any]]:
-    """Get all WhatsApp chats involving the contact.
-    
-    Args:
-        jid: The contact's JID to search for
-        limit: Maximum number of chats to return (default 20)
-        page: Page number for pagination (default 0)
-    """
-    chats = whatsapp_get_contact_chats(jid, limit, page)
-    return chats
-
-@mcp.tool()
-def get_last_interaction(jid: str) -> str:
-    """Get most recent WhatsApp message involving the contact.
-    
-    Args:
-        jid: The JID of the contact to search for
-    """
-    message = whatsapp_get_last_interaction(jid)
-    return message
+    if not is_allowed(chat_jid, ALLOWLIST):
+        return {"error": f"{chat_jid} is not in the allowlist."}
+    return whatsapp_get_chat(chat_jid, include_last_message)
 
 @mcp.tool()
 def get_message_context(
@@ -145,14 +132,18 @@ def get_message_context(
     after: int = 5
 ) -> Dict[str, Any]:
     """Get context around a specific WhatsApp message.
-    
+
     Args:
         message_id: The ID of the message to get context for
         before: Number of messages to include before the target message (default 5)
         after: Number of messages to include after the target message (default 5)
     """
-    context = whatsapp_get_message_context(message_id, before, after)
-    return context
+    ctx = whatsapp_get_message_context(message_id, before, after)
+    if ctx is None or not is_allowed(ctx.message.chat_jid, ALLOWLIST):
+        return {"error": "Message not found or not in the allowlist."}
+    ctx.before = filter_messages(ctx.before, ALLOWLIST)
+    ctx.after = filter_messages(ctx.after, ALLOWLIST)
+    return ctx
 
 @mcp.tool()
 def send_message(
@@ -232,19 +223,15 @@ def download_media(message_id: str, chat_jid: str) -> Dict[str, Any]:
     Returns:
         A dictionary containing success status, a status message, and the file path if successful
     """
-    file_path = whatsapp_download_media(message_id, chat_jid)
-    
-    if file_path:
-        return {
-            "success": True,
-            "message": "Media downloaded successfully",
-            "file_path": file_path
-        }
-    else:
-        return {
-            "success": False,
-            "message": "Failed to download media"
-        }
+    if not is_allowed(chat_jid, ALLOWLIST):
+        return {"error": f"{chat_jid} is not in the allowlist."}
+    return whatsapp_download_media(message_id, chat_jid)
+
+@mcp.tool()
+def list_allowed_chats():
+    """Return the chats and groups the agent is permitted to read and message."""
+    return [{"jid": jid, "label": label} for jid, label in ALLOWLIST.items()]
+
 
 if __name__ == "__main__":
     # Initialize and run the server
