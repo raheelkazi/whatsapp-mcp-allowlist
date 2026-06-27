@@ -32,3 +32,23 @@ def load_allowlist(path: str) -> dict[str, str]:
 
 def is_allowed(jid: str, allowlist: dict[str, str]) -> bool:
     return jid in allowlist
+
+
+def normalize_recipient(recipient: str) -> str:
+    if "@" in recipient:
+        return recipient
+    digits = recipient.lstrip("+").replace(" ", "").replace("-", "")
+    if digits.isdigit():
+        return f"{digits}@s.whatsapp.net"
+    raise AllowlistError(
+        f"Cannot interpret recipient {recipient!r} as a phone number or JID."
+    )
+
+
+def check_send(recipient: str, allowlist: dict[str, str]) -> str:
+    jid = normalize_recipient(recipient)
+    if not is_allowed(jid, allowlist):
+        raise AllowlistError(
+            f"{jid} is not in the allowlist; add it with manage_allowlist.py."
+        )
+    return jid
