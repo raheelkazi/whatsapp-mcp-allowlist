@@ -1,0 +1,12 @@
+# WhatsApp session + message store (sensitive, machine-local)
+whatsapp-bridge/store/
+**/allowed_chats.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Go
+*.exe
