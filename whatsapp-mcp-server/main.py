@@ -143,7 +143,7 @@ def get_message_context(
     return ctx
 
 @mcp.tool()
-def send_message(recipient: str, message: str):
+def send_message(recipient: str, message: str) -> Dict[str, Any]:
     """Send a text message to an allowlisted person or group."""
     try:
         jid = check_send(recipient, ALLOWLIST)
@@ -153,7 +153,7 @@ def send_message(recipient: str, message: str):
     return {"success": success, "message": status}
 
 @mcp.tool()
-def send_file(recipient: str, media_path: str):
+def send_file(recipient: str, media_path: str) -> Dict[str, Any]:
     """Send an image, video, or document to an allowlisted person or group."""
     try:
         jid = check_send(recipient, ALLOWLIST)
