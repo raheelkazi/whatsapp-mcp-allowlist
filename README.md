@@ -28,12 +28,10 @@ allowlist of people and groups. Every send requires your confirmation.
    ```bash
    cp .mcp.json.example .mcp.json
    ```
-   Then copy `.claude/settings.json` into your project's `.claude/` directory to
-   auto-approve the 7 read-only tools so Claude Code can call them without
-   prompting:
-   ```bash
-   cp .claude/settings.json .claude/settings.json
-   ```
+   The committed `.claude/settings.json` auto-approves the 7 read-only tools so
+   Claude Code can call them without prompting. If you already have a
+   `.claude/settings.json`, merge its `permissions.allow` entries into yours
+   rather than overwriting.
    The `permissions.allow` entries follow the Claude Code naming convention
    `mcp__<server>__<tool>`. The send tools (`send_message`, `send_file`) are
    deliberately omitted from the allow-list, so every outgoing message requires
