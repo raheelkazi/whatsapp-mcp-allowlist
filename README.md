@@ -18,9 +18,9 @@ allowlist of people and groups. Every send requires your confirmation.
 2. **Curate the allowlist.** Find JIDs and add them (the server reads/sends
    nothing until you do — it is fail-closed):
    ```bash
-   python manage_allowlist.py search "Mom"
-   python manage_allowlist.py add 1234567890@s.whatsapp.net "Mom"
-   python manage_allowlist.py list
+   python3 manage_allowlist.py search "Mom"
+   python3 manage_allowlist.py add 1234567890@s.whatsapp.net "Mom"
+   python3 manage_allowlist.py list
    ```
 
 3. **Register the MCP server:** copy `.mcp.json.example` to `.mcp.json`.
