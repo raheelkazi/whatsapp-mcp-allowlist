@@ -74,10 +74,8 @@ def search_contacts_db(db_path: str, query: str) -> list:
         rows = []
     finally:
         conn.close()
-    results = []
-    for jid, full, push, first, biz in rows:
-        results.append({"jid": jid, "name": full or push or first or biz or ""})
-    return results
+    return [{"jid": jid, "name": full or push or first or biz or ""}
+            for jid, full, push, first, biz in rows]
 
 
 def main(argv=None):

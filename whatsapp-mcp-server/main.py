@@ -152,6 +152,9 @@ def get_message_context(
         return {"error": f"Message not found or not retrievable: {e}"}
     if not is_allowed(ctx.message.chat_jid, ALLOWLIST):
         return {"error": "Message not found or not in the allowlist."}
+    # Defense-in-depth: the bridge already scopes context to the target chat,
+    # so these are normally no-ops — kept in case a future bridge change returns
+    # cross-chat context.
     ctx.before = filter_messages(ctx.before, ALLOWLIST)
     ctx.after = filter_messages(ctx.after, ALLOWLIST)
     return ctx

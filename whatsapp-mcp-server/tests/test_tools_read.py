@@ -1,8 +1,7 @@
 # whatsapp-mcp-server/tests/test_tools_read.py
-import importlib
+# main_with_allowlist fixture is provided by conftest.py
 from dataclasses import dataclass, field
 from typing import List
-import pytest
 
 
 @dataclass
@@ -22,25 +21,10 @@ class FakeContact:
 
 
 @dataclass
-class FakeMessage:
-    chat_jid: str
-
-
-@dataclass
 class FakeContext:
-    message: FakeMessage
+    message: FakeMsg
     before: List[FakeMsg] = field(default_factory=list)
     after: List[FakeMsg] = field(default_factory=list)
-
-
-@pytest.fixture
-def main_with_allowlist(tmp_path, monkeypatch):
-    path = tmp_path / "allowed_chats.json"
-    path.write_text('{"chats":[{"jid":"111@s.whatsapp.net","label":"Mom"}]}')
-    monkeypatch.setenv("WHATSAPP_ALLOWLIST_PATH", str(path))
-    import main
-    importlib.reload(main)
-    return main
 
 
 def test_list_chats_filters_to_allowlist(main_with_allowlist, monkeypatch):
@@ -115,7 +99,7 @@ def test_get_message_context_off_list_returns_error(main_with_allowlist, monkeyp
     monkeypatch.setattr(
         main,
         "whatsapp_get_message_context",
-        lambda msg_id, before, after: FakeContext(message=FakeMessage("999@s.whatsapp.net")),
+        lambda msg_id, before, after: FakeContext(message=FakeMsg("999@s.whatsapp.net")),
     )
     result = main.get_message_context("msg-1")
     assert "error" in result
@@ -134,7 +118,7 @@ def test_get_message_context_not_found_raises_and_returns_error(main_with_allowl
 def test_get_message_context_allowed_filters_before_after(main_with_allowlist, monkeypatch):
     main = main_with_allowlist
     ctx = FakeContext(
-        message=FakeMessage("111@s.whatsapp.net"),
+        message=FakeMsg("111@s.whatsapp.net"),
         before=[FakeMsg("111@s.whatsapp.net"), FakeMsg("999@s.whatsapp.net")],
         after=[FakeMsg("999@s.whatsapp.net"), FakeMsg("111@s.whatsapp.net")],
     )
