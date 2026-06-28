@@ -54,18 +54,18 @@ def test_search_contacts_db_matches_name_fields(tmp_path):
         "redacted_phone TEXT)"
     )
     conn.execute("INSERT INTO whatsmeow_contacts VALUES "
-                 "('me','206@s.whatsapp.net','','Alisha Ramos',NULL,NULL,NULL)")
+                 "('me','206@s.whatsapp.net','','Ada Carter',NULL,NULL,NULL)")
     conn.execute("INSERT INTO whatsmeow_contacts VALUES "
-                 "('me','659@s.whatsapp.net',NULL,NULL,'Alisha',NULL,NULL)")
+                 "('me','659@s.whatsapp.net',NULL,NULL,'Ada',NULL,NULL)")
     conn.execute("INSERT INTO whatsmeow_contacts VALUES "
                  "('me','999@s.whatsapp.net',NULL,NULL,'Bob',NULL,NULL)")
     conn.commit()
     conn.close()
-    results = m.search_contacts_db(db, "Alisha")
+    results = m.search_contacts_db(db, "Ada")
     byjid = {r["jid"]: r["name"] for r in results}
-    assert "999@s.whatsapp.net" not in byjid              # non-match excluded
-    assert byjid["206@s.whatsapp.net"] == "Alisha Ramos"  # full_name preferred
-    assert byjid["659@s.whatsapp.net"] == "Alisha"        # falls back to push_name
+    assert "999@s.whatsapp.net" not in byjid            # non-match excluded
+    assert byjid["206@s.whatsapp.net"] == "Ada Carter"  # full_name preferred
+    assert byjid["659@s.whatsapp.net"] == "Ada"         # falls back to push_name
 
 
 def test_search_contacts_db_missing_file_returns_empty(tmp_path):
