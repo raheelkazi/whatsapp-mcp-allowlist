@@ -13,6 +13,8 @@ DEFAULT_ALLOWLIST = os.path.join(
     os.path.dirname(__file__), "whatsapp-mcp-server", "allowed_chats.json")
 DEFAULT_DB = os.path.join(
     os.path.dirname(__file__), "whatsapp-bridge", "store", "messages.db")
+DEFAULT_CONTACTS_DB = os.path.join(
+    os.path.dirname(__file__), "whatsapp-bridge", "store", "whatsapp.db")
 
 
 def read_entries(path: str) -> list:
@@ -49,10 +51,40 @@ def search_db(db_path: str, query: str) -> list:
     return [{"jid": jid, "name": name} for jid, name in rows]
 
 
+def search_contacts_db(db_path: str, query: str) -> list:
+    """Search whatsmeow's contact store (whatsapp.db) by any name field.
+
+    Individual contacts' names live here, not in messages.db's chats table,
+    so a chat-name search alone misses people you have not yet messaged.
+    """
+    if not os.path.exists(db_path):
+        return []
+    conn = sqlite3.connect(db_path)
+    like = f"%{query}%"
+    try:
+        rows = conn.execute(
+            "SELECT their_jid, full_name, push_name, first_name, business_name "
+            "FROM whatsmeow_contacts "
+            "WHERE full_name LIKE ? OR push_name LIKE ? "
+            "OR first_name LIKE ? OR business_name LIKE ? "
+            "ORDER BY full_name",
+            (like, like, like, like),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        rows = []
+    finally:
+        conn.close()
+    results = []
+    for jid, full, push, first, biz in rows:
+        results.append({"jid": jid, "name": full or push or first or biz or ""})
+    return results
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description="Curate the WhatsApp MCP allowlist.")
     p.add_argument("--allowlist", default=DEFAULT_ALLOWLIST)
     p.add_argument("--db", default=DEFAULT_DB)
+    p.add_argument("--contacts-db", default=DEFAULT_CONTACTS_DB)
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("search"); s.add_argument("query")
     a = sub.add_parser("add"); a.add_argument("jid"); a.add_argument("label")
@@ -61,7 +93,13 @@ def main(argv=None):
     args = p.parse_args(argv)
 
     if args.cmd == "search":
-        for row in search_db(args.db, args.query):
+        seen = set()
+        rows = search_db(args.db, args.query) + \
+            search_contacts_db(args.contacts_db, args.query)
+        for row in rows:
+            if row["jid"] in seen:
+                continue
+            seen.add(row["jid"])
             print(f"{row['jid']}\t{row['name']}")
     elif args.cmd == "add":
         add_entry(args.allowlist, args.jid, args.label)
