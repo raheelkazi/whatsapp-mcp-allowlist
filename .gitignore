@@ -13,3 +13,6 @@ __pycache__/
 
 # Agent worktrees (scratch)
 .claude/worktrees/
+
+# Superpowers session ledger (local scratch)
+.superpowers/
