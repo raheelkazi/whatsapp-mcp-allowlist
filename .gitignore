@@ -10,3 +10,6 @@ __pycache__/
 
 # Go
 *.exe
+
+# Agent worktrees (scratch)
+.claude/worktrees/
