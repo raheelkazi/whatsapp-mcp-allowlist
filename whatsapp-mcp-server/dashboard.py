@@ -55,6 +55,13 @@ def _bridge_reachable(host="localhost", port=8080, timeout=0.3) -> bool:
 
 def create_app(send_fn=bridge_send) -> FastAPI:
     app = FastAPI(title="WhatsApp Dashboard")
+    from fastapi.middleware.cors import CORSMiddleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     allowlist = load_allowlist(ALLOWLIST_PATH)  # fail-closed at startup
     rate_limiter = ratelimit.from_env()
     app.state.allowlist = allowlist
@@ -141,3 +148,8 @@ def create_app(send_fn=bridge_send) -> FastAPI:
         return result
 
     return app
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(create_app(), host="127.0.0.1", port=8000)
