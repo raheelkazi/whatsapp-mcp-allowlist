@@ -3,6 +3,7 @@
 import json
 import os
 import socket
+import sqlite3
 import sys
 import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -45,6 +46,14 @@ CONTACTS_DB_PATH = os.environ.get(
 )
 
 
+def _safe(fn, path, q):
+    """Call fn(path, q) and return [] if the DB is missing or unreadable."""
+    try:
+        return fn(path, q)
+    except sqlite3.Error:
+        return []
+
+
 def _bridge_reachable(host="localhost", port=8080, timeout=0.3) -> bool:
     try:
         with socket.create_connection((host, port), timeout=timeout):
@@ -63,6 +72,9 @@ def create_app(send_fn=bridge_send) -> FastAPI:
         allow_headers=["*"],
     )
     allowlist = load_allowlist(ALLOWLIST_PATH)  # fail-closed at startup
+    # NOTE: each process (dashboard + MCP server) holds its own in-process rate
+    # limiter, so running both concurrently can allow up to 2× the configured
+    # send rate.  A shared limiter (e.g. via Redis or a socket) is future work.
     rate_limiter = ratelimit.from_env()
     app.state.allowlist = allowlist
     app.state.rate_limiter = rate_limiter
@@ -108,8 +120,8 @@ def create_app(send_fn=bridge_send) -> FastAPI:
     @app.get("/api/contacts/search")
     def contacts_search(q: str):
         seen, out = set(), []
-        for row in (manage_allowlist.search_db(DB_PATH, q)
-                    + manage_allowlist.search_contacts_db(CONTACTS_DB_PATH, q)):
+        for row in (_safe(manage_allowlist.search_db, DB_PATH, q)
+                    + _safe(manage_allowlist.search_contacts_db, CONTACTS_DB_PATH, q)):
             if row["jid"] in seen:
                 continue
             seen.add(row["jid"])

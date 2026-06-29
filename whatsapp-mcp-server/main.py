@@ -21,8 +21,6 @@ from allowlist import (
     filter_messages,
     filter_contacts,
     is_allowed,
-    check_send,
-    AllowlistError,
 )
 from send_core import perform_send
 
@@ -37,6 +35,9 @@ ALLOWLIST = load_allowlist(ALLOWLIST_PATH)
 READ_ONLY = os.environ.get("WHATSAPP_READ_ONLY", "").strip().lower() in (
     "1", "true", "yes", "on",
 )
+# NOTE: each process (dashboard + MCP server) holds its own in-process rate
+# limiter, so running both concurrently can allow up to 2× the configured
+# send rate.  A shared limiter (e.g. via Redis or a socket) is future work.
 RATE_LIMITER = ratelimit.from_env()
 
 # Initialize FastMCP server

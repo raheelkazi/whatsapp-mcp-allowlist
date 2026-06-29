@@ -59,3 +59,25 @@ def test_contacts_search_merges_sources(ctx):
     jids = {row["jid"] for row in client.get("/api/contacts/search?q=Family").json()}
     assert "222@g.us" in jids        # from chats
     assert "333@s.whatsapp.net" in jids  # from contact store
+
+
+@pytest.fixture
+def ctx_missing_dbs(tmp_path, monkeypatch):
+    """Fixture where both bridge DBs do not exist (bridge never run)."""
+    allow = tmp_path / "allowed_chats.json"
+    allow.write_text('{"chats":[]}')
+    monkeypatch.setenv("WHATSAPP_ALLOWLIST_PATH", str(allow))
+    monkeypatch.setenv("WHATSAPP_AUDIT_LOG", str(tmp_path / "audit.log"))
+    monkeypatch.setenv("WHATSAPP_DB", str(tmp_path / "nonexistent_messages.db"))
+    monkeypatch.setenv("WHATSAPP_CONTACTS_DB", str(tmp_path / "nonexistent_whatsapp.db"))
+    import dashboard
+    importlib.reload(dashboard)
+    return dashboard
+
+
+def test_contacts_search_missing_dbs_returns_empty(ctx_missing_dbs):
+    """contacts/search must return 200 [] when bridge DBs don't exist yet."""
+    client = TestClient(ctx_missing_dbs.create_app())
+    r = client.get("/api/contacts/search?q=anything")
+    assert r.status_code == 200
+    assert r.json() == []
