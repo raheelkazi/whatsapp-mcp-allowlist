@@ -4,15 +4,29 @@ import json
 import os
 import socket
 import sys
+import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import requests
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 import manage_allowlist
 import ratelimit
 from allowlist import load_allowlist, VALID_MODES
-from audit import audit_path
+from audit import audit_path, log_event, classify
+from send_core import perform_send
+
+BRIDGE_SEND_URL = os.environ.get("WHATSAPP_BRIDGE_SEND_URL", "http://localhost:8080/api/send")
+
+
+def bridge_send(jid, body):
+    try:
+        resp = requests.post(BRIDGE_SEND_URL, json={"recipient": jid, "message": body}, timeout=10)
+        ok = resp.status_code == 200
+        return ok, (resp.text if not ok else f"Message sent to {jid}")
+    except requests.RequestException as e:
+        return False, f"bridge error: {e}"
 
 ALLOWLIST_PATH = os.environ.get(
     "WHATSAPP_ALLOWLIST_PATH",
@@ -39,7 +53,7 @@ def _bridge_reachable(host="localhost", port=8080, timeout=0.3) -> bool:
         return False
 
 
-def create_app() -> FastAPI:
+def create_app(send_fn=bridge_send) -> FastAPI:
     app = FastAPI(title="WhatsApp Dashboard")
     allowlist = load_allowlist(ALLOWLIST_PATH)  # fail-closed at startup
     rate_limiter = ratelimit.from_env()
@@ -111,5 +125,19 @@ def create_app() -> FastAPI:
             if len(rows) >= limit:
                 break
         return rows
+
+    class SendBody(BaseModel):
+        recipient: str
+        message: str
+
+    @app.post("/api/send")
+    def send(body: SendBody):
+        result = perform_send(body.recipient, body.message, allowlist=app.state.allowlist,
+                              rate_limiter=app.state.rate_limiter, read_only=READ_ONLY,
+                              send_fn=send_fn, now=time.time())
+        decision, reason = classify(result)
+        log_event({"tool": "dashboard_send", "target": body.recipient,
+                   "decision": decision, "reason": reason})
+        return result
 
     return app
