@@ -22,3 +22,9 @@ audit.log
 
 # Claude Code harness scratch (scheduler lock, etc.)
 .claude/*.lock
+
+# Dashboard
+dashboard_cache.json
+.env
+dashboard-web/node_modules/
+dashboard-web/dist/
