@@ -2,11 +2,15 @@
 """Localhost-only FastAPI dashboard backend. Reuses the allowlist/guard layer."""
 import os
 import socket
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
+import manage_allowlist
 import ratelimit
-from allowlist import load_allowlist
+from allowlist import load_allowlist, VALID_MODES
 
 ALLOWLIST_PATH = os.environ.get(
     "WHATSAPP_ALLOWLIST_PATH",
@@ -14,6 +18,14 @@ ALLOWLIST_PATH = os.environ.get(
 )
 READ_ONLY = os.environ.get("WHATSAPP_READ_ONLY", "").strip().lower() in (
     "1", "true", "yes", "on",
+)
+DB_PATH = os.environ.get(
+    "WHATSAPP_DB",
+    os.path.join(os.path.dirname(__file__), "..", "whatsapp-bridge", "store", "messages.db"),
+)
+CONTACTS_DB_PATH = os.environ.get(
+    "WHATSAPP_CONTACTS_DB",
+    os.path.join(os.path.dirname(__file__), "..", "whatsapp-bridge", "store", "whatsapp.db"),
 )
 
 
@@ -42,5 +54,43 @@ def create_app() -> FastAPI:
                 "max_per_hour": rate_limiter.max_per_hour,
             },
         }
+
+    class AllowEntry(BaseModel):
+        jid: str
+        label: str
+        mode: str = "read+send"
+
+    def _reload():
+        app.state.allowlist = load_allowlist(ALLOWLIST_PATH)
+
+    @app.get("/api/allowlist")
+    def list_allowlist():
+        return [{"jid": jid, "label": v["label"], "mode": v["mode"]}
+                for jid, v in app.state.allowlist.items()]
+
+    @app.post("/api/allowlist")
+    def add_allowlist(entry: AllowEntry):
+        if entry.mode not in VALID_MODES:
+            raise HTTPException(status_code=400, detail=f"mode must be one of {VALID_MODES}")
+        manage_allowlist.add_entry(ALLOWLIST_PATH, entry.jid, entry.label, entry.mode)
+        _reload()
+        return {"ok": True}
+
+    @app.delete("/api/allowlist/{jid:path}")
+    def remove_allowlist(jid: str):
+        manage_allowlist.remove_entry(ALLOWLIST_PATH, jid)
+        _reload()
+        return {"ok": True}
+
+    @app.get("/api/contacts/search")
+    def contacts_search(q: str):
+        seen, out = set(), []
+        for row in (manage_allowlist.search_db(DB_PATH, q)
+                    + manage_allowlist.search_contacts_db(CONTACTS_DB_PATH, q)):
+            if row["jid"] in seen:
+                continue
+            seen.add(row["jid"])
+            out.append(row)
+        return out
 
     return app
