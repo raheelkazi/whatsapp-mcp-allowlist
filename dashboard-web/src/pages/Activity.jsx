@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 export default function Activity() {
   const [rows, setRows] = useState([]);
-  useEffect(() => { api.activity(200).then(setRows); }, []);
+  const [err, setErr] = useState(null);
+  useEffect(() => { api.activity(200).then(setRows).catch(e => setErr(e.message)); }, []);
   return (
     <div>
       <h1>Activity</h1>
+      {err && <div className="error">Backend error: {err}</div>}
       <table className="tbl">
         <thead><tr><th>Time</th><th>Tool</th><th>Target</th><th>Decision</th><th>Reason</th></tr></thead>
         <tbody>

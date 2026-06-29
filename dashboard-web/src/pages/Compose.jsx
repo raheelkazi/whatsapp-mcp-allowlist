@@ -4,7 +4,15 @@ export default function Compose() {
   const [chats, setChats] = useState([]), [to, setTo] = useState(""), [msg, setMsg] = useState("");
   const [confirm, setConfirm] = useState(false), [result, setResult] = useState(null);
   useEffect(() => { api.allowlist().then((r) => setChats(r.filter((c) => c.mode === "read+send"))); }, []);
-  const doSend = async () => { setConfirm(false); setResult(await api.send(to, msg)); setMsg(""); };
+  const doSend = async () => {
+    setConfirm(false);
+    try {
+      setResult(await api.send(to, msg));
+      setMsg("");
+    } catch (e) {
+      setResult({ success: false, message: e.message });
+    }
+  };
   return (
     <div>
       <h1>Compose</h1>

@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 export default function Allowlist() {
   const [rows, setRows] = useState([]), [q, setQ] = useState(""), [hits, setHits] = useState([]);
-  const load = () => api.allowlist().then(setRows);
+  const [err, setErr] = useState(null);
+  const load = () => api.allowlist().then(setRows).catch(e => setErr(e.message));
   useEffect(() => { load(); }, []);
   const search = async () => setHits(await api.searchContacts(q));
   const add = async (jid, label, mode) => { await api.addAllow({ jid, label, mode }); setHits([]); setQ(""); load(); };
   return (
     <div>
       <h1>Allowlist &amp; Permissions</h1>
+      {err && <div className="error">Backend error: {err}</div>}
       <div className="row">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search contacts/groups…" />
         <button onClick={search}>Search</button>
