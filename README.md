@@ -59,11 +59,12 @@ WhatsApp account to link.
    Scan the QR with WhatsApp → Settings → Linked Devices. Leave it running.
 
 2. **Curate the allowlist.** The server reads/sends nothing until you add entries
-   (fail-closed):
+   (fail-closed). Use `--read-only` to allow reading a chat but never sending to it:
    ```bash
    python3 manage_allowlist.py search "Mom"          # find a JID by name
    python3 manage_allowlist.py add 1234567890@s.whatsapp.net "Mom"
-   python3 manage_allowlist.py list
+   python3 manage_allowlist.py add 99999@g.us "Work Group" --read-only
+   python3 manage_allowlist.py list                  # shows jid, label, mode
    ```
 
 3. **Register the MCP server.** Copy the example launch config:
@@ -82,10 +83,25 @@ WhatsApp account to link.
   `get_message_context`, `search_contacts`, `download_media`, `list_allowed_chats`
 - **Send (allowlist-checked + confirmation):** `send_message`, `send_file`
 
+## Safety controls
+
+Beyond the allowlist, several guardrails reduce the blast radius and ban risk:
+
+| Control | How |
+|---|---|
+| **Per-chat mode** | Each allowlist entry is `read` or `read+send` (default `read+send`; `--read-only` sets `read`). A `read` chat can be read but never messaged. |
+| **Kill-switch** | `WHATSAPP_READ_ONLY=1` disables *all* sends at startup; reads still work. |
+| **Send rate limit** | Sends are rejected (not queued) if they come faster than `WHATSAPP_SEND_MIN_INTERVAL_SEC` (default 3) apart or exceed `WHATSAPP_SEND_MAX_PER_HOUR` (default 30). Guards against accidental spam / bans. |
+| **Audit log** | Every tool call (reads, sends, blocks) is appended as one JSON line to `WHATSAPP_AUDIT_LOG` (default `whatsapp-mcp-server/audit.log`, gitignored). |
+| **Confirmation on send** | Send tools are omitted from auto-approval, so your MCP client prompts before each outgoing message. |
+
+Reads also resolve group senders' `@lid` numeric IDs to real contact names.
+
 ## Privacy
 
-Your synced messages (`whatsapp-bridge/store/`), your `allowed_chats.json`, and your
-local `.mcp.json` are **gitignored** — they never leave your machine.
+Your synced messages (`whatsapp-bridge/store/`), your `allowed_chats.json`, your
+local `.mcp.json`, and the `audit.log` are **gitignored** — they never leave your
+machine.
 
 ## Tests
 
