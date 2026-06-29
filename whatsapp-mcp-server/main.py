@@ -24,6 +24,7 @@ from allowlist import (
     check_send,
     AllowlistError,
 )
+from send_core import perform_send
 
 ALLOWLIST_PATH = os.environ.get(
     "WHATSAPP_ALLOWLIST_PATH",
@@ -177,33 +178,17 @@ def get_message_context(
 @audited
 def send_message(recipient: str, message: str) -> Dict[str, Any]:
     """Send a text message to an allowlisted person or group."""
-    if READ_ONLY:
-        return {"success": False, "message": "sends disabled (read-only mode)"}
-    try:
-        jid = check_send(recipient, ALLOWLIST)
-    except AllowlistError as e:
-        return {"success": False, "message": str(e)}
-    allowed, reason = RATE_LIMITER.try_send(time.time())
-    if not allowed:
-        return {"success": False, "message": f"rate limited: {reason}"}
-    success, status = whatsapp_send_message(jid, message)
-    return {"success": success, "message": status}
+    return perform_send(recipient, message, allowlist=ALLOWLIST,
+                        rate_limiter=RATE_LIMITER, read_only=READ_ONLY,
+                        send_fn=whatsapp_send_message, now=time.time())
 
 @mcp.tool()
 @audited
 def send_file(recipient: str, media_path: str) -> Dict[str, Any]:
     """Send an image, video, or document to an allowlisted person or group."""
-    if READ_ONLY:
-        return {"success": False, "message": "sends disabled (read-only mode)"}
-    try:
-        jid = check_send(recipient, ALLOWLIST)
-    except AllowlistError as e:
-        return {"success": False, "message": str(e)}
-    allowed, reason = RATE_LIMITER.try_send(time.time())
-    if not allowed:
-        return {"success": False, "message": f"rate limited: {reason}"}
-    success, status = whatsapp_send_file(jid, media_path)
-    return {"success": success, "message": status}
+    return perform_send(recipient, media_path, allowlist=ALLOWLIST,
+                        rate_limiter=RATE_LIMITER, read_only=READ_ONLY,
+                        send_fn=whatsapp_send_file, now=time.time())
 
 @mcp.tool()
 @audited
