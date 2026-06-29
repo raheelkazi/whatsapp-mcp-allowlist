@@ -29,9 +29,9 @@ def _write_entries(path: str, entries: list) -> None:
         json.dump({"chats": entries}, f, indent=2)
 
 
-def add_entry(path: str, jid: str, label: str) -> None:
+def add_entry(path: str, jid: str, label: str, mode: str = "read+send") -> None:
     entries = [e for e in read_entries(path) if e["jid"] != jid]
-    entries.append({"jid": jid, "label": label})
+    entries.append({"jid": jid, "label": label, "mode": mode})
     _write_entries(path, entries)
 
 
@@ -86,6 +86,8 @@ def main(argv=None):
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("search"); s.add_argument("query")
     a = sub.add_parser("add"); a.add_argument("jid"); a.add_argument("label")
+    a.add_argument("--read-only", action="store_true",
+                   help="allow reading this chat but not sending to it")
     r = sub.add_parser("remove"); r.add_argument("jid")
     sub.add_parser("list")
     args = p.parse_args(argv)
@@ -100,14 +102,15 @@ def main(argv=None):
             seen.add(row["jid"])
             print(f"{row['jid']}\t{row['name']}")
     elif args.cmd == "add":
-        add_entry(args.allowlist, args.jid, args.label)
-        print(f"Added {args.label} ({args.jid})")
+        mode = "read" if args.read_only else "read+send"
+        add_entry(args.allowlist, args.jid, args.label, mode)
+        print(f"Added {args.label} ({args.jid}) [{mode}]")
     elif args.cmd == "remove":
         remove_entry(args.allowlist, args.jid)
         print(f"Removed {args.jid}")
     elif args.cmd == "list":
         for e in read_entries(args.allowlist):
-            print(f"{e['jid']}\t{e.get('label','')}")
+            print(f"{e['jid']}\t{e.get('label','')}\t{e.get('mode', 'read+send')}")
 
 
 if __name__ == "__main__":
