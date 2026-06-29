@@ -4,10 +4,19 @@ import os
 
 
 class AllowlistError(Exception):
-    """Raised when the allowlist cannot be loaded or a target is not allowed."""
+    """Raised when the allowlist file is missing, malformed, or has invalid entries."""
 
 
-def load_allowlist(path: str) -> dict[str, str]:
+VALID_MODES = ("read", "read+send")
+DEFAULT_MODE = "read+send"
+
+
+def load_allowlist(path: str) -> dict[str, dict]:
+    """Load the allowlist as {jid: {"label": str, "mode": str}}.
+
+    An entry without a "mode" defaults to "read+send" (backward compatible).
+    Fails closed on a missing/malformed file or an invalid mode value.
+    """
     if not os.path.exists(path):
         raise AllowlistError(
             f"Allowlist not found at {path}. Create it with manage_allowlist.py."
@@ -22,16 +31,28 @@ def load_allowlist(path: str) -> dict[str, str]:
     if not isinstance(chats, list):
         raise AllowlistError("Allowlist must be an object with a 'chats' list.")
 
-    result: dict[str, str] = {}
+    result: dict[str, dict] = {}
     for entry in chats:
         if not isinstance(entry, dict) or "jid" not in entry:
             raise AllowlistError(f"Allowlist entry missing 'jid': {entry!r}")
-        result[entry["jid"]] = entry.get("label", entry["jid"])
+        mode = entry.get("mode", DEFAULT_MODE)
+        if mode not in VALID_MODES:
+            raise AllowlistError(
+                f"Allowlist entry {entry['jid']} has invalid mode {mode!r}; "
+                f"must be one of {VALID_MODES}."
+            )
+        result[entry["jid"]] = {"label": entry.get("label", entry["jid"]), "mode": mode}
     return result
 
 
-def is_allowed(jid: str, allowlist: dict[str, str]) -> bool:
+def is_allowed(jid: str, allowlist: dict[str, dict]) -> bool:
+    """Membership = readable. Every allowlisted chat is readable."""
     return jid in allowlist
+
+
+def can_send(jid: str, allowlist: dict[str, dict]) -> bool:
+    """A chat is sendable only if it is allowlisted AND its mode is read+send."""
+    return jid in allowlist and allowlist[jid]["mode"] == "read+send"
 
 
 def normalize_recipient(recipient: str) -> str:
@@ -47,11 +68,15 @@ def normalize_recipient(recipient: str) -> str:
     )
 
 
-def check_send(recipient: str, allowlist: dict[str, str]) -> str:
+def check_send(recipient: str, allowlist: dict[str, dict]) -> str:
     jid = normalize_recipient(recipient)
     if not is_allowed(jid, allowlist):
         raise AllowlistError(
             f"{jid} is not in the allowlist; add it with manage_allowlist.py."
+        )
+    if not can_send(jid, allowlist):
+        raise AllowlistError(
+            f"{jid} is read-only; mark it read+send to allow sending."
         )
     return jid
 
