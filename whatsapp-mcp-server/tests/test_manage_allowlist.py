@@ -9,7 +9,27 @@ import manage_allowlist as m
 def test_add_then_read_roundtrips(tmp_path):
     path = str(tmp_path / "allowed_chats.json")
     m.add_entry(path, "111@s.whatsapp.net", "Mom")
-    assert m.read_entries(path) == [{"jid": "111@s.whatsapp.net", "label": "Mom"}]
+    assert m.read_entries(path) == [
+        {"jid": "111@s.whatsapp.net", "label": "Mom", "mode": "read+send"}
+    ]
+
+
+def test_add_read_only_sets_mode(tmp_path):
+    path = str(tmp_path / "allowed_chats.json")
+    m.add_entry(path, "222@g.us", "Work", mode="read")
+    assert m.read_entries(path)[0]["mode"] == "read"
+
+
+def test_add_via_cli_read_only_flag(tmp_path):
+    path = str(tmp_path / "allowed_chats.json")
+    m.main(["--allowlist", path, "add", "222@g.us", "Work", "--read-only"])
+    assert m.read_entries(path)[0]["mode"] == "read"
+
+
+def test_add_via_cli_defaults_read_send(tmp_path):
+    path = str(tmp_path / "allowed_chats.json")
+    m.main(["--allowlist", path, "add", "111@s.whatsapp.net", "Mom"])
+    assert m.read_entries(path)[0]["mode"] == "read+send"
 
 
 def test_add_is_idempotent_on_jid(tmp_path):
@@ -26,7 +46,9 @@ def test_remove_entry(tmp_path):
     m.add_entry(path, "111@s.whatsapp.net", "Mom")
     m.add_entry(path, "222@g.us", "Family")
     m.remove_entry(path, "111@s.whatsapp.net")
-    assert m.read_entries(path) == [{"jid": "222@g.us", "label": "Family"}]
+    assert m.read_entries(path) == [
+        {"jid": "222@g.us", "label": "Family", "mode": "read+send"}
+    ]
 
 
 def test_read_missing_file_returns_empty(tmp_path):

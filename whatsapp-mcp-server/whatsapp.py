@@ -8,7 +8,39 @@ import json
 import audio
 
 MESSAGES_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'whatsapp-bridge', 'store', 'messages.db')
+CONTACTS_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'whatsapp-bridge', 'store', 'whatsapp.db')
 WHATSAPP_API_BASE_URL = "http://localhost:8080/api"
+
+# Cache of whatsmeow contact names ({db_path: {their_jid: name}}), loaded once per
+# path. Resolves @lid / bare-number senders (e.g. group members) to real names.
+_CONTACTS_CACHE: dict = {}
+
+
+def _contacts_for(db_path: str) -> dict:
+    if db_path in _CONTACTS_CACHE:
+        return _CONTACTS_CACHE[db_path]
+    cache: dict = {}
+    try:
+        conn = sqlite3.connect(db_path)
+        try:
+            rows = conn.execute(
+                "SELECT their_jid, full_name, push_name, first_name FROM whatsmeow_contacts"
+            ).fetchall()
+        finally:
+            conn.close()
+        for jid, full, push, first in rows:
+            name = full or push or first
+            if name:
+                cache[jid] = name
+    except sqlite3.Error:
+        pass  # best-effort; fall back to raw IDs
+    _CONTACTS_CACHE[db_path] = cache
+    return cache
+
+
+def resolve_contact_name(jid: str, db_path: Optional[str] = None) -> Optional[str]:
+    """Return a contact's display name from the whatsmeow contact store, or None."""
+    return _contacts_for(db_path or CONTACTS_DB_PATH).get(jid)
 
 @dataclass
 class Message:
@@ -81,9 +113,12 @@ def get_sender_name(sender_jid: str) -> str:
         
         if result and result[0]:
             return result[0]
-        else:
-            return sender_jid
-        
+        # Fall back to the whatsmeow contact store (resolves @lid group senders).
+        name = resolve_contact_name(sender_jid)
+        if name:
+            return name
+        return sender_jid
+
     except sqlite3.Error as e:
         print(f"Database error while getting sender name: {e}")
         return sender_jid

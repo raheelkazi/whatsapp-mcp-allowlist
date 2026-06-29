@@ -1,7 +1,10 @@
 # whatsapp-mcp-server/tests/test_allowlist.py
 import json
 import pytest
-from allowlist import load_allowlist, is_allowed, AllowlistError, normalize_recipient, check_send
+from allowlist import (
+    load_allowlist, is_allowed, can_send, AllowlistError,
+    normalize_recipient, check_send,
+)
 
 
 def write(tmp_path, obj):
@@ -10,15 +13,30 @@ def write(tmp_path, obj):
     return str(p)
 
 
-def test_load_returns_jid_to_label_map(tmp_path):
+def test_load_returns_jid_to_entry_map(tmp_path):
     path = write(tmp_path, {"chats": [
-        {"jid": "111@s.whatsapp.net", "label": "Mom"},
-        {"jid": "222@g.us", "label": "Family"},
+        {"jid": "111@s.whatsapp.net", "label": "Mom", "mode": "read+send"},
+        {"jid": "222@g.us", "label": "Family", "mode": "read"},
     ]})
     assert load_allowlist(path) == {
-        "111@s.whatsapp.net": "Mom",
-        "222@g.us": "Family",
+        "111@s.whatsapp.net": {"label": "Mom", "mode": "read+send"},
+        "222@g.us": {"label": "Family", "mode": "read"},
     }
+
+
+def test_load_entry_without_mode_defaults_to_read_send(tmp_path):
+    # backward compat: pre-existing entries have no "mode"
+    path = write(tmp_path, {"chats": [{"jid": "111@s.whatsapp.net", "label": "Mom"}]})
+    al = load_allowlist(path)
+    assert al["111@s.whatsapp.net"] == {"label": "Mom", "mode": "read+send"}
+
+
+def test_load_invalid_mode_fails_closed(tmp_path):
+    path = write(tmp_path, {"chats": [
+        {"jid": "111@s.whatsapp.net", "label": "Mom", "mode": "write-only"},
+    ]})
+    with pytest.raises(AllowlistError):
+        load_allowlist(path)
 
 
 def test_missing_file_fails_closed(tmp_path):
@@ -66,13 +84,29 @@ def test_normalize_rejects_garbage():
         normalize_recipient("not a number")
 
 
-def test_check_send_allows_listed_target():
-    al = {"1234567890@s.whatsapp.net": "Mom"}
+def test_can_send_respects_mode():
+    al = {
+        "111@s.whatsapp.net": {"label": "Mom", "mode": "read+send"},
+        "222@g.us": {"label": "Work", "mode": "read"},
+    }
+    assert can_send("111@s.whatsapp.net", al) is True
+    assert can_send("222@g.us", al) is False        # read-only
+    assert can_send("999@s.whatsapp.net", al) is False  # off-list
+
+
+def test_check_send_allows_read_send_target():
+    al = {"1234567890@s.whatsapp.net": {"label": "Mom", "mode": "read+send"}}
     assert check_send("1234567890", al) == "1234567890@s.whatsapp.net"
 
 
+def test_check_send_rejects_read_only_target():
+    al = {"1234567890@s.whatsapp.net": {"label": "Work", "mode": "read"}}
+    with pytest.raises(AllowlistError, match="read-only"):
+        check_send("1234567890", al)
+
+
 def test_check_send_rejects_unlisted_target():
-    al = {"1234567890@s.whatsapp.net": "Mom"}
+    al = {"1234567890@s.whatsapp.net": {"label": "Mom", "mode": "read+send"}}
     with pytest.raises(AllowlistError):
         check_send("999@s.whatsapp.net", al)
 
