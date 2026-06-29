@@ -39,7 +39,9 @@ def test_list_chats_filters_to_allowlist(main_with_allowlist, monkeypatch):
 
 def test_list_allowed_chats_returns_entries(main_with_allowlist):
     result = main_with_allowlist.list_allowed_chats()
-    assert result == [{"jid": "111@s.whatsapp.net", "label": "Mom"}]
+    assert result == [
+        {"jid": "111@s.whatsapp.net", "label": "Mom", "mode": "read+send"}
+    ]
 
 
 # ---------------------------------------------------------------------------

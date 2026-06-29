@@ -1,7 +1,10 @@
 import os
 import sqlite3
+import time
 from typing import List, Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
+import ratelimit
+from audit import audited
 from whatsapp import (
     search_contacts as whatsapp_search_contacts,
     list_messages as whatsapp_list_messages,
@@ -29,10 +32,17 @@ ALLOWLIST_PATH = os.environ.get(
 # Fail-closed: if this raises, the server does not start.
 ALLOWLIST = load_allowlist(ALLOWLIST_PATH)
 
+# Global kill-switch: disables all sends when set (reads still work).
+READ_ONLY = os.environ.get("WHATSAPP_READ_ONLY", "").strip().lower() in (
+    "1", "true", "yes", "on",
+)
+RATE_LIMITER = ratelimit.from_env()
+
 # Initialize FastMCP server
 mcp = FastMCP("whatsapp")
 
 @mcp.tool()
+@audited
 def search_contacts(query: str) -> List[Dict[str, Any]]:
     """Search WhatsApp contacts by name or phone number.
 
@@ -43,6 +53,7 @@ def search_contacts(query: str) -> List[Dict[str, Any]]:
     return filter_contacts(contacts, ALLOWLIST)
 
 @mcp.tool()
+@audited
 def list_messages(
     after: Optional[str] = None,
     before: Optional[str] = None,
@@ -96,6 +107,7 @@ def list_messages(
     )
 
 @mcp.tool()
+@audited
 def list_chats(
     query: Optional[str] = None,
     limit: int = 20,
@@ -122,6 +134,7 @@ def list_chats(
     return filter_chats(chats, ALLOWLIST)
 
 @mcp.tool()
+@audited
 def get_chat(chat_jid: str, include_last_message: bool = True) -> Dict[str, Any]:
     """Get WhatsApp chat metadata by JID.
     
@@ -134,6 +147,7 @@ def get_chat(chat_jid: str, include_last_message: bool = True) -> Dict[str, Any]
     return whatsapp_get_chat(chat_jid, include_last_message)
 
 @mcp.tool()
+@audited
 def get_message_context(
     message_id: str,
     before: int = 5,
@@ -160,26 +174,39 @@ def get_message_context(
     return ctx
 
 @mcp.tool()
+@audited
 def send_message(recipient: str, message: str) -> Dict[str, Any]:
     """Send a text message to an allowlisted person or group."""
+    if READ_ONLY:
+        return {"success": False, "message": "sends disabled (read-only mode)"}
     try:
         jid = check_send(recipient, ALLOWLIST)
     except AllowlistError as e:
         return {"success": False, "message": str(e)}
+    allowed, reason = RATE_LIMITER.try_send(time.time())
+    if not allowed:
+        return {"success": False, "message": f"rate limited: {reason}"}
     success, status = whatsapp_send_message(jid, message)
     return {"success": success, "message": status}
 
 @mcp.tool()
+@audited
 def send_file(recipient: str, media_path: str) -> Dict[str, Any]:
     """Send an image, video, or document to an allowlisted person or group."""
+    if READ_ONLY:
+        return {"success": False, "message": "sends disabled (read-only mode)"}
     try:
         jid = check_send(recipient, ALLOWLIST)
     except AllowlistError as e:
         return {"success": False, "message": str(e)}
+    allowed, reason = RATE_LIMITER.try_send(time.time())
+    if not allowed:
+        return {"success": False, "message": f"rate limited: {reason}"}
     success, status = whatsapp_send_file(jid, media_path)
     return {"success": success, "message": status}
 
 @mcp.tool()
+@audited
 def download_media(message_id: str, chat_jid: str) -> Dict[str, Any]:
     """Download media from a WhatsApp message and get the local file path.
     
@@ -195,9 +222,11 @@ def download_media(message_id: str, chat_jid: str) -> Dict[str, Any]:
     return whatsapp_download_media(message_id, chat_jid)
 
 @mcp.tool()
+@audited
 def list_allowed_chats():
-    """Return the chats and groups the agent is permitted to read and message."""
-    return [{"jid": jid, "label": label} for jid, label in ALLOWLIST.items()]
+    """Return the chats the agent may access, each with its mode (read / read+send)."""
+    return [{"jid": jid, "label": v["label"], "mode": v["mode"]}
+            for jid, v in ALLOWLIST.items()]
 
 
 if __name__ == "__main__":

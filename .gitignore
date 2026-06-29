@@ -16,3 +16,6 @@ __pycache__/
 
 # Superpowers session ledger (local scratch)
 .superpowers/
+
+# Audit log (local)
+audit.log
