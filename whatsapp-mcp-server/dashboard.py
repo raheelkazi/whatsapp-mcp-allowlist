@@ -1,5 +1,6 @@
 # whatsapp-mcp-server/dashboard.py
 """Localhost-only FastAPI dashboard backend. Reuses the allowlist/guard layer."""
+import json
 import os
 import socket
 import sys
@@ -11,6 +12,7 @@ from pydantic import BaseModel
 import manage_allowlist
 import ratelimit
 from allowlist import load_allowlist, VALID_MODES
+from audit import audit_path
 
 ALLOWLIST_PATH = os.environ.get(
     "WHATSAPP_ALLOWLIST_PATH",
@@ -92,5 +94,22 @@ def create_app() -> FastAPI:
             seen.add(row["jid"])
             out.append(row)
         return out
+
+    @app.get("/api/activity")
+    def activity(limit: int = 100):
+        path = audit_path()
+        if not os.path.exists(path):
+            return []
+        with open(path) as f:
+            lines = f.read().splitlines()
+        rows = []
+        for line in reversed(lines):       # newest first
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+            if len(rows) >= limit:
+                break
+        return rows
 
     return app
