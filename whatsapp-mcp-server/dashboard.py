@@ -167,6 +167,10 @@ def create_app(send_fn=bridge_send, generators=None) -> FastAPI:
         return result
 
     def _fetch(jid):
+        # Defense in depth: never read a chat that isn't on the allowlist,
+        # even if a caller passes an off-list jid.
+        if jid not in app.state.allowlist:
+            return ""
         out = whatsapp_list_messages(chat_jid=jid, include_context=False, limit=40)
         return out if isinstance(out, str) else ""
 

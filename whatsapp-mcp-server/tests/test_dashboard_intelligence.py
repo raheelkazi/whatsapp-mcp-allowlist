@@ -57,3 +57,27 @@ def test_unavailable_when_no_generators_and_no_key(make, monkeypatch):
     r = client.get("/api/summaries").json()
     assert r["items"] == []
     assert "ANTHROPIC_API_KEY" in r["error"]
+
+
+def test_fetch_guard_refuses_off_allowlist_jid(make, monkeypatch):
+    # Defense in depth: even if a caller hands _fetch an off-list jid, it must
+    # return "" and never read that chat via list_messages.
+    import dashboard
+    fetched = []
+    monkeypatch.setattr(dashboard, "whatsapp_list_messages",
+                        lambda **kw: fetched.append(kw.get("chat_jid")) or "leaked!",
+                        raising=False)
+    probe = {}
+
+    def fake_summarize(allowlist, fetch_fn, gen_text):
+        probe["off"] = fetch_fn("999@off.list")      # off the allowlist
+        probe["on"] = fetch_fn("111@s.whatsapp.net")  # on the allowlist
+        return []
+
+    monkeypatch.setattr(dashboard.intelligence, "summarize", fake_summarize)
+    client = dashboard.create_app(generators=_gens())
+    client = TestClient(client)
+    client.get("/api/summaries")
+    assert probe["off"] == ""                 # guard returned empty, no read
+    assert probe["on"] == "leaked!"           # allowlisted chat still readable
+    assert fetched == ["111@s.whatsapp.net"]  # list_messages never hit for off-list jid
