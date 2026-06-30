@@ -104,6 +104,10 @@ def create_app(send_fn=bridge_send, generators=None) -> FastAPI:
 
     def _reload():
         app.state.allowlist = load_allowlist(ALLOWLIST_PATH)
+        # The intelligence cache is keyed to the previous chat set; an allowlist
+        # change must invalidate it so stale summaries/suggestions/reminders are
+        # not served for the new set. Next load recomputes.
+        dashcache.clear(DASHBOARD_CACHE)
 
     @app.get("/api/allowlist")
     def list_allowlist():

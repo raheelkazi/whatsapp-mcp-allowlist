@@ -21,3 +21,16 @@ def test_put_merges_sections(tmp_path):
     dashcache.put_section(path, "reminders", [2])
     assert dashcache.get_section(path, "summaries")["data"] == [1]
     assert dashcache.get_section(path, "reminders")["data"] == [2]
+
+
+def test_clear_removes_all_sections(tmp_path):
+    path = str(tmp_path / "cache.json")
+    dashcache.put_section(path, "summaries", [1])
+    dashcache.put_section(path, "reminders", [2])
+    dashcache.clear(path)
+    assert dashcache.load(path) == {}
+    assert dashcache.get_section(path, "summaries") is None
+
+
+def test_clear_missing_file_is_noop(tmp_path):
+    dashcache.clear(str(tmp_path / "nope.json"))  # must not raise

@@ -71,6 +71,22 @@ def test_section_returns_error_envelope_on_generator_exception(make):
     assert "boom" in body["error"]
 
 
+def test_allowlist_edit_invalidates_cache(make):
+    # After an allowlist add, the previously-cached intelligence sections must be
+    # dropped so the next load recomputes for the new chat set (not stale results).
+    import os
+    import dashcache
+    client = make(_gens(text="A summary."))
+    client.get("/api/summaries")  # populate the cache
+    cache_path = os.environ["WHATSAPP_DASHBOARD_CACHE"]
+    assert dashcache.get_section(cache_path, "summaries") is not None  # cached now
+
+    r = client.post("/api/allowlist",
+                    json={"jid": "999@s.whatsapp.net", "label": "New", "mode": "read"})
+    assert r.status_code == 200
+    assert dashcache.get_section(cache_path, "summaries") is None  # cache invalidated
+
+
 def test_suggestions_shape(make):
     client = make(_gens(js=[{"chat_jid": "111@s.whatsapp.net", "draft": "Yes!"}]))
     r = client.get("/api/suggestions").json()
