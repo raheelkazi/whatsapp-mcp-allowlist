@@ -12,4 +12,7 @@ export const api = {
   searchContacts: (q) => j(`/api/contacts/search?q=${encodeURIComponent(q)}`),
   activity: (limit = 100) => j(`/api/activity?limit=${limit}`),
   send: (recipient, message) => j("/api/send", { method: "POST", body: JSON.stringify({ recipient, message }) }),
+  summaries: (refresh = 0) => j(`/api/summaries?refresh=${refresh}`),
+  suggestions: (refresh = 0) => j(`/api/suggestions?refresh=${refresh}`),
+  reminders: (refresh = 0) => j(`/api/reminders?refresh=${refresh}`),
 };
