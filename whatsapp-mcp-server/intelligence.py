@@ -15,10 +15,20 @@ SUMMARY_SYSTEM = (
     "Be concrete and neutral. Output only the summary text."
 )
 SUGGEST_SYSTEM = (
-    "You draft a short, natural reply for chats that appear to have an "
-    "unanswered message addressed to the user. Return a JSON array of objects "
-    'with keys "chat_jid", "context" (why a reply is suggested), and "draft". '
-    "Only include chats that genuinely need a reply; return [] if none."
+    "You help the user participate in their WhatsApp chats. Across the allowlisted "
+    "chats below, find moments where the user sending a short message would be "
+    "natural and timely, and draft that message. Include two kinds of moments:\n"
+    "1. Direct messages or questions addressed to the user that look unanswered.\n"
+    "2. Social moments the user should join in on — when others are collectively "
+    "wishing someone a happy birthday or anniversary, congratulating someone, "
+    "sending condolences or tributes, welcoming someone, or exchanging festival or "
+    "milestone greetings — and the user has not already posted a similar message.\n"
+    'Messages shown as "From: Me:" are the user\'s own; never suggest something the '
+    "user has effectively already said. Match each chat's tone, language, and "
+    "length; keep drafts short, warm, and genuine. Do not invent facts (names, "
+    "dates, events) that are not present in the messages. Return a JSON array of "
+    'objects with keys "chat_jid", "context" (one line on why it is suggested), '
+    'and "draft". Only include genuinely warranted suggestions; return [] if none.'
 )
 REMINDERS_SYSTEM = (
     "You find reminders across the user's allowlisted WhatsApp chats: "
