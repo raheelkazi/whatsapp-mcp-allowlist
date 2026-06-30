@@ -17,6 +17,9 @@ import ratelimit
 from allowlist import load_allowlist, VALID_MODES
 from audit import audit_path, log_event, classify
 from send_core import perform_send
+import intelligence
+import dashcache
+from whatsapp import list_messages as whatsapp_list_messages
 
 BRIDGE_SEND_URL = os.environ.get("WHATSAPP_BRIDGE_SEND_URL", "http://localhost:8080/api/send")
 
@@ -44,6 +47,10 @@ CONTACTS_DB_PATH = os.environ.get(
     "WHATSAPP_CONTACTS_DB",
     os.path.join(os.path.dirname(__file__), "..", "whatsapp-bridge", "store", "whatsapp.db"),
 )
+DASHBOARD_CACHE = os.environ.get(
+    "WHATSAPP_DASHBOARD_CACHE",
+    os.path.join(os.path.dirname(__file__), "dashboard_cache.json"),
+)
 
 
 def _safe(fn, path, q):
@@ -62,7 +69,7 @@ def _bridge_reachable(host="localhost", port=8080, timeout=0.3) -> bool:
         return False
 
 
-def create_app(send_fn=bridge_send) -> FastAPI:
+def create_app(send_fn=bridge_send, generators=None) -> FastAPI:
     app = FastAPI(title="WhatsApp Dashboard")
     from fastapi.middleware.cors import CORSMiddleware
     app.add_middleware(
@@ -158,6 +165,48 @@ def create_app(send_fn=bridge_send) -> FastAPI:
         log_event({"tool": "dashboard_send", "target": body.recipient,
                    "decision": decision, "reason": reason})
         return result
+
+    def _fetch(jid):
+        out = whatsapp_list_messages(chat_jid=jid, include_context=False, limit=40)
+        return out if isinstance(out, str) else ""
+
+    def _get_generators():
+        if generators is not None:
+            return generators
+        return intelligence.make_generators()  # may raise IntelligenceUnavailable
+
+    def _section(name, compute, refresh):
+        if not refresh:
+            cached = dashcache.get_section(DASHBOARD_CACHE, name)
+            if cached is not None:
+                return {"items": cached["data"], "generated_at": cached["generated_at"],
+                        "error": None}
+        try:
+            gen_text, gen_json = _get_generators()
+        except intelligence.IntelligenceUnavailable as e:
+            return {"items": [], "generated_at": None, "error": str(e) +
+                    " — set ANTHROPIC_API_KEY"}
+        data = compute(gen_text, gen_json)
+        stored = dashcache.put_section(DASHBOARD_CACHE, name, data)
+        return {"items": data, "generated_at": stored["generated_at"], "error": None}
+
+    @app.get("/api/summaries")
+    def summaries(refresh: int = 0):
+        return _section("summaries",
+                        lambda gt, gj: intelligence.summarize(app.state.allowlist, _fetch, gt),
+                        refresh)
+
+    @app.get("/api/suggestions")
+    def suggestions(refresh: int = 0):
+        return _section("suggestions",
+                        lambda gt, gj: intelligence.suggest(app.state.allowlist, _fetch, gj),
+                        refresh)
+
+    @app.get("/api/reminders")
+    def reminders_ep(refresh: int = 0):
+        return _section("reminders",
+                        lambda gt, gj: intelligence.reminders(app.state.allowlist, _fetch, gj),
+                        refresh)
 
     return app
 
