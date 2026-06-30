@@ -1,4 +1,4 @@
-const ITEMS = [["home", "🏠 Home"], ["allowlist", "🔐 Allowlist"], ["activity", "🪵 Activity"], ["compose", "✍️ Compose"]];
+const ITEMS = [["home", "🏠 Home"], ["summaries", "📋 Summaries"], ["suggestions", "✍️ Suggestions"], ["reminders", "🔔 Reminders"], ["allowlist", "🔐 Allowlist"], ["activity", "🪵 Activity"], ["compose", "✍️ Compose"]];
 export default function Sidebar({ page, setPage }) {
   return (
     <nav className="sidebar">

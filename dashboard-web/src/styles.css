@@ -22,3 +22,6 @@ button { background: #2a3942; color: #e9edef; border: 0; padding: 8px 12px; bord
 .hit { opacity: .9; }
 .muted { opacity: .6; }
 code { color: #8fd6ff; }
+.card2 { background: #111b21; padding: 12px; border-radius: 10px; margin: 8px 0; }
+.card2 blockquote { background: #0b141a; padding: 10px; border-radius: 8px; margin: 8px 0; }
+h3 { margin-top: 20px; }
