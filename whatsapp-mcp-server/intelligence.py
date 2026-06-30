@@ -65,6 +65,8 @@ def suggest(allowlist: dict, fetch_fn, generate_json) -> list:
     out = []
     for it in items:
         jid = it.get("chat_jid") or next(iter(gathered))
+        if jid not in allowlist:
+            continue
         out.append({
             "chat_jid": jid,
             "label": allowlist.get(jid, {}).get("label", jid),
@@ -96,7 +98,8 @@ def _extract_json(text: str):
     fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
     payload = fence.group(1).strip() if fence else text.strip()
     try:
-        return json.loads(payload)
+        parsed = json.loads(payload)
+        return parsed if isinstance(parsed, (list, dict)) else []
     except (json.JSONDecodeError, ValueError):
         return []
 
@@ -109,10 +112,16 @@ def make_generators(client=None):
         client = anthropic.Anthropic()
 
     def _call(system, user):
-        resp = client.messages.create(
-            model=MODEL, max_tokens=2000, system=system,
-            messages=[{"role": "user", "content": user}],
-        )
+        try:
+            resp = client.messages.create(
+                model=MODEL, max_tokens=2000, system=system,
+                messages=[{"role": "user", "content": user}],
+            )
+        except Exception as e:
+            import anthropic
+            if isinstance(e, anthropic.AuthenticationError):
+                raise IntelligenceUnavailable("invalid ANTHROPIC_API_KEY") from e
+            raise
         return "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
 
     def generate_text(system, user):

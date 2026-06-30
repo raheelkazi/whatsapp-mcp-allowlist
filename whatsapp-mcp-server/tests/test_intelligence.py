@@ -46,3 +46,16 @@ def test_reminders_passes_all_chat_text_and_returns_items():
     out = intelligence.reminders(ALLOW, _fetch, gen_json)
     assert out[0]["kind"] == "unanswered"
     assert "Mom" in seen["user"]  # label included so the model can name the chat
+
+
+def test_suggest_drops_off_allowlist_jid():
+    """Items whose chat_jid is not in the allowlist must be silently dropped."""
+    def gen_json(system, user):
+        return [
+            {"chat_jid": "999@off.list", "draft": "Should be dropped", "context": "x"},
+            {"chat_jid": "111@s.whatsapp.net", "draft": "Should be kept", "context": "y"},
+        ]
+    out = intelligence.suggest(ALLOW, _fetch, gen_json)
+    jids = [item["chat_jid"] for item in out]
+    assert "999@off.list" not in jids
+    assert "111@s.whatsapp.net" in jids

@@ -39,3 +39,21 @@ def test_make_generators_without_key_raises(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     with pytest.raises(intelligence.IntelligenceUnavailable):
         intelligence.make_generators()
+
+
+def test_generate_json_bare_scalar_returns_empty_list():
+    """A bare JSON scalar (e.g. 42) must not propagate — callers expect list|dict."""
+    _, gj = intelligence.make_generators(FakeClient("42"))
+    assert gj("sys", "user") == []
+
+
+def test_generate_json_bare_string_returns_empty_list():
+    """A bare JSON string (e.g. \"hi\") must return [] not the string itself."""
+    _, gj = intelligence.make_generators(FakeClient('"hi"'))
+    assert gj("sys", "user") == []
+
+
+def test_generate_json_bare_bool_returns_empty_list():
+    """A bare JSON boolean must return [] not the bool."""
+    _, gj = intelligence.make_generators(FakeClient("true"))
+    assert gj("sys", "user") == []

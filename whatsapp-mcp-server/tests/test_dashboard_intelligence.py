@@ -28,14 +28,47 @@ def _gens(text="Summary.", js=None):
 
 
 def test_summaries_returns_items_and_caches(make):
+    # Basic shape: first call populates data and generated_at
     client = make(_gens(text="Asked about the plumber."))
     r = client.get("/api/summaries").json()
     assert r["error"] is None
     assert r["items"][0]["summary"] == "Asked about the plumber."
     assert r["generated_at"]
-    # second call (no refresh) is served from cache even if generators would differ
-    client2_items = client.get("/api/summaries").json()["items"]
-    assert client2_items[0]["summary"] == "Asked about the plumber."
+
+
+def test_summaries_caches_between_apps_and_refresh_bypasses_cache(make):
+    # Build client A with "A summary" generators and populate the on-disk cache.
+    client_a = make(_gens(text="A summary."))
+    r1 = client_a.get("/api/summaries").json()
+    assert r1["error"] is None
+    assert r1["items"][0]["summary"] == "A summary."
+    generated_at_1 = r1["generated_at"]
+
+    # Build a NEW client with "B summary" generators — same cache path on disk.
+    # Without ?refresh=1 the cached A value must still be served.
+    client_b = make(_gens(text="B summary."))
+    r2 = client_b.get("/api/summaries").json()
+    assert r2["items"][0]["summary"] == "A summary.", "cache must return old value without refresh"
+    assert r2["generated_at"] == generated_at_1
+
+    # With ?refresh=1 the new generators run and B summary is stored and returned.
+    r3 = client_b.get("/api/summaries?refresh=1").json()
+    assert r3["items"][0]["summary"] == "B summary."
+    assert r3["generated_at"] != generated_at_1, "generated_at must change after refresh"
+
+
+def test_section_returns_error_envelope_on_generator_exception(make):
+    """Generators that raise at call-time must never produce a 500; return HTTP-200 error envelope."""
+    def raising(s, u):
+        raise RuntimeError("boom")
+
+    client = make((raising, raising))
+    r = client.get("/api/summaries")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["items"] == []
+    assert body["error"] is not None
+    assert "boom" in body["error"]
 
 
 def test_suggestions_shape(make):

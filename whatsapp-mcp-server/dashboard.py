@@ -187,10 +187,12 @@ def create_app(send_fn=bridge_send, generators=None) -> FastAPI:
                         "error": None}
         try:
             gen_text, gen_json = _get_generators()
+            data = compute(gen_text, gen_json)
         except intelligence.IntelligenceUnavailable as e:
             return {"items": [], "generated_at": None, "error": str(e) +
                     " — set ANTHROPIC_API_KEY"}
-        data = compute(gen_text, gen_json)
+        except Exception as e:
+            return {"items": [], "generated_at": None, "error": f"intelligence unavailable: {e}"}
         stored = dashcache.put_section(DASHBOARD_CACHE, name, data)
         return {"items": data, "generated_at": stored["generated_at"], "error": None}
 
