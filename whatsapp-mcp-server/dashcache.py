@@ -26,6 +26,6 @@ def put_section(path: str, name: str, data) -> dict:
     try:
         with open(path, "w") as f:
             json.dump(cache, f)
-    except OSError:
-        pass  # best-effort cache; never break a request on a write failure
+    except (OSError, TypeError):
+        pass  # best-effort cache; never break a request on a write/serialize failure
     return section
