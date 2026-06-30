@@ -19,6 +19,14 @@ def get_section(path: str, name: str):
     return load(path).get(name)
 
 
+def clear(path: str) -> None:
+    """Drop all cached sections (best-effort); the next load recomputes."""
+    try:
+        os.remove(path)
+    except OSError:
+        pass  # already absent or unremovable; nothing to invalidate
+
+
 def put_section(path: str, name: str, data) -> dict:
     cache = load(path)
     section = {"generated_at": datetime.now(timezone.utc).isoformat(), "data": data}
