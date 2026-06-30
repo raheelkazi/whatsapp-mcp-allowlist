@@ -4,7 +4,9 @@
 The LLM call is injected (generate_text / generate_json) so this module is
 fully testable without a network or API key.
 """
+import json
 import os
+import re
 
 MODEL = os.environ.get("WHATSAPP_DASHBOARD_MODEL", "claude-opus-4-8")
 
@@ -84,3 +86,39 @@ def reminders(allowlist: dict, fetch_fn, generate_json) -> list:
         "related_chat_jid": it.get("related_chat_jid"),
         "suggested_action": it.get("suggested_action", ""),
     } for it in items]
+
+
+class IntelligenceUnavailable(Exception):
+    """Raised when the Anthropic API is not configured or rejects auth."""
+
+
+def _extract_json(text: str):
+    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
+    payload = fence.group(1).strip() if fence else text.strip()
+    try:
+        return json.loads(payload)
+    except (json.JSONDecodeError, ValueError):
+        return []
+
+
+def make_generators(client=None):
+    if client is None:
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            raise IntelligenceUnavailable("ANTHROPIC_API_KEY is not set")
+        import anthropic
+        client = anthropic.Anthropic()
+
+    def _call(system, user):
+        resp = client.messages.create(
+            model=MODEL, max_tokens=2000, system=system,
+            messages=[{"role": "user", "content": user}],
+        )
+        return "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+
+    def generate_text(system, user):
+        return _call(system, user).strip()
+
+    def generate_json(system, user):
+        return _extract_json(_call(system, user))
+
+    return generate_text, generate_json
